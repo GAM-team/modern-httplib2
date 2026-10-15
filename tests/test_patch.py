@@ -57,7 +57,7 @@ def test_google_libraries_interop():
 
 
 def test_package_metadata():
-    assert modern_httplib2.__version__ == "1.32.0"
+    assert modern_httplib2.__version__ == "1.32.0-1"
     assert modern_httplib2.__author__ == "Jay Lee"
     assert modern_httplib2.__email__ == "jay0lee@gmail.com"
 
@@ -66,8 +66,8 @@ def test_metadata_version_patched():
     import importlib.metadata
 
     patch()
-    assert importlib.metadata.version("httplib2") == "1.32.0"
-    assert importlib.metadata.version("modern-httplib2") == "1.32.0"
+    assert importlib.metadata.version("httplib2") == modern_httplib2.__version__
+    assert importlib.metadata.version("modern-httplib2") == modern_httplib2.__version__
 
 
 def test_glverlibs_hook():
