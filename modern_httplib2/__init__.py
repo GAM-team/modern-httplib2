@@ -1692,8 +1692,16 @@ class _Httplib2RawResponse:
             self.version = 20
         elif http_ver == b"HTTP/1.0":
             self.version = 10
+        elif http_ver == b"HTTP/0.9":
+            self.version = 9
         else:
             self.version = 11
+
+        self.http_version = (
+            http_ver.decode("ascii", errors="replace")
+            if isinstance(http_ver, bytes)
+            else str(http_ver)
+        )
 
         reason_bytes = hc_resp.extensions.get("reason_phrase")
         if reason_bytes is not None:
@@ -2899,6 +2907,7 @@ class Response(dict):
 
     fromcache = False
     version = 11
+    http_version = "HTTP/1.1"
     status = 200
     reason = "Ok"
     previous = None
@@ -2920,14 +2929,26 @@ class Response(dict):
             self.reason = info.reason
             self.version = info.version
             self.stream_id = getattr(info, "stream_id", None)
+            self.http_version = getattr(info, "http_version", None)
         elif isinstance(info, email.message.Message):
             for key, value in list(info.items()):
                 self[key.lower()] = value
             self.status = int(self["status"])
+            self.http_version = None
         else:
             for key, value in info.items():
                 self[key.lower()] = value
             self.status = int(self.get("status", self.status))
+            self.http_version = None
+
+        if self.http_version is None:
+            ver_map = {20: "HTTP/2", 11: "HTTP/1.1", 10: "HTTP/1.0", 9: "HTTP/0.9"}
+            self.http_version = ver_map.get(
+                self.version,
+                f"HTTP/{self.version // 10}.{self.version % 10}"
+                if isinstance(self.version, int)
+                else "HTTP/1.1",
+            )
 
     def __getattr__(self, name):
         if name == "dict":
