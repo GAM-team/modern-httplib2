@@ -27,7 +27,7 @@ def clean_env():
 @pytest.fixture()
 def ca_certs_tmpfile(clean_env):
     tmpfd, tmpfile = tempfile.mkstemp()
-    open(tmpfile, 'a').close()
+    os.close(tmpfd)
     yield tmpfile
     os.remove(tmpfile)
 

@@ -223,24 +223,23 @@ def test_parse_www_authenticate_malformed(data):
 
 
 def test_parse_www_authenticate_complexity():
-    # TODO just use time.process_time() after python2 support is removed
-    process_time = getattr(time, "process_time", time.time)
+    perf_counter = getattr(time, "perf_counter", time.time)
 
     def check(size):
         header = {"www-authenticate": 'scheme {0}key=value,{0}quoted="foo=bar"'.format(" \t" * size)}
-        tbegin = process_time()
+        tbegin = perf_counter()
         result = httplib2.auth._parse_www_authenticate(header)
-        tend = process_time()
+        tend = perf_counter()
         assert result == {"scheme": {"key": "value", "quoted": "foo=bar"}}
-        elapsed_us = round((tend * 1e6) - (tbegin * 1e6), 0)
+        elapsed_us = round((tend - tbegin) * 1e6, 2)
         return elapsed_us
 
     n1, n2, repeat = 50, 100, 7
-    time1 = min(check(n1) for _ in range(repeat))
-    time2 = min(check(n2) for _ in range(repeat))
-    speed1 = round(time1 / n1, 1)
-    speed2 = round(time2 / n2, 1)
-    expect2 = round(speed1 * (float(n2) / n1), 1)
+    time1 = max(min(check(n1) for _ in range(repeat)), 1.0)
+    time2 = max(min(check(n2) for _ in range(repeat)), 1.0)
+    speed1 = round(time1 / n1, 3)
+    speed2 = round(time2 / n2, 3)
+    expect2 = max(round(speed1 * (float(n2) / n1), 3), 0.001)
     error = round(speed2 / expect2, 1)
     print("x{}: time={}us speed={} us/op".format(n1, time1, speed1))
     print("x{}: time={}us speed={} us/op expected={} us/op error={}".format(n2, time2, speed2, expect2, error))

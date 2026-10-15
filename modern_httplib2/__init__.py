@@ -1533,7 +1533,8 @@ class _Httplib2HTTP2Connection(_HttpcoreHTTP2Connection):
                 amount = event.flow_controlled_length
                 with self._write_lock:
                     self._h2_state.acknowledge_received_data(amount, stream_id)
-                    self._write_outgoing_data(request)
+                    with contextlib.suppress(OSError, _HttpcoreWriteError):
+                        self._write_outgoing_data(request)
                 yield event.data
             elif isinstance(event, _h2_events.StreamEnded):
                 break
@@ -1890,7 +1891,11 @@ class HTTPConnectionWithTimeout(http.client.HTTPConnection):
         socket_err = None
         sock = None
 
-        for res in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
+        addrinfos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+        if isinstance(host, str) and host.lower() == "localhost":
+            addrinfos.sort(key=lambda r: 0 if r[0] == socket.AF_INET else 1)
+
+        for res in addrinfos:
             af, socktype, proto, canonname, sa = res
             try:
                 if use_proxy:
@@ -1921,7 +1926,8 @@ class HTTPConnectionWithTimeout(http.client.HTTPConnection):
                     sock.close()
                 raise
             except socket.error as e:
-                socket_err = e
+                if socket_err is None or "PySocks doesn't support IPv6" not in str(e):
+                    socket_err = e
                 if self.debuglevel > 0:
                     _debug_print(f"connect fail: ({self.host}, {self.port})")
                     if use_proxy:
@@ -2407,11 +2413,13 @@ class Http:
 
     def _record_host_downgrade(self, host_or_authority):
         self._http2_downgraded_hosts.add(host_or_authority)
-        host_only = host_or_authority.split(":")[0]
-        self._http2_downgraded_hosts.add(host_only)
         with _DOWNGRADE_LOCK:
             DOWNGRADED_HOSTS.add(host_or_authority)
-            DOWNGRADED_HOSTS.add(host_only)
+        if ":" not in host_or_authority or host_or_authority.endswith(":443"):
+            host_only = host_or_authority.split(":")[0]
+            self._http2_downgraded_hosts.add(host_only)
+            with _DOWNGRADE_LOCK:
+                DOWNGRADED_HOSTS.add(host_only)
 
     def _is_host_downgraded(self, host_or_authority):
         host_only = host_or_authority.split(":")[0]
@@ -2493,7 +2501,12 @@ class Http:
                             f"auto-downgrade: HTTP/2 failed for {conn.host} ({type(exc).__name__}: {exc}), "
                             f"falling back to HTTP/1.1 and retrying"
                         )
-                    self._record_host_downgrade(conn.host)
+                    conn_authority = (
+                        f"{conn.host}:{conn.port}"
+                        if getattr(conn, "port", None) not in (None, 443)
+                        else conn.host
+                    )
+                    self._record_host_downgrade(conn_authority)
                     conn.downgrade_to_http1()
                     i = 0
                     continue

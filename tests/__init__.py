@@ -315,6 +315,9 @@ def server_socket(fun, request_count=1, timeout=5, scheme="", tls=None):
             keep &= request.headers.get("connection", "").lower() != "close"
         return keep
 
+    closing = [False]
+    clients = []
+
     def server_socket_thread(srv):
         try:
             while gcounter[0] < request_count:
@@ -324,13 +327,20 @@ def server_socket(fun, request_count=1, timeout=5, scheme="", tls=None):
                     if e.reason in tls_skip_errors:
                         return
                     raise
+                except ConnectionResetError:
+                    return
+                except OSError:
+                    if closing[0]:
+                        return
+                    raise
 
+                clients.append(client)
                 try:
                     client.settimeout(timeout)
                     fun(client, tick)
                 finally:
                     try:
-                        client.shutdown(socket.SHUT_RDWR)
+                        client.shutdown(socket.SHUT_WR)
                     except (IOError, socket.error):
                         pass
                     # FIXME: client.close() introduces connection reset by peer
@@ -374,8 +384,14 @@ def server_socket(fun, request_count=1, timeout=5, scheme="", tls=None):
         yield (bind_hostname, server_port)
     else:
         yield u"{scheme}://{host}:{port}/".format(scheme=scheme, host=bind_hostname, port=server_port)
+    closing[0] = True
     server.close()
     t.join()
+    for client in clients:
+        try:
+            client.close()
+        except (IOError, socket.error):
+            pass
     if gresult[0] is not None:
         raise gresult[0]
 

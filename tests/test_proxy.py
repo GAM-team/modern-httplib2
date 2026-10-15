@@ -69,8 +69,10 @@ def test_from_env_https(monkeypatch):
 
 
 @pytest.mark.forked
-def test_from_env_none():
-    os.environ.clear()
+def test_from_env_none(monkeypatch):
+    for k in list(os.environ):
+        if "proxy" in k.lower():
+            monkeypatch.delenv(k, raising=False)
     pi = httplib2.proxy_info_from_environment()
     assert pi is None
 
