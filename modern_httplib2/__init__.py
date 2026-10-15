@@ -102,6 +102,7 @@ __all__ = [
     "RedirectMissingLocation",
     "Response",
     "debug_print",
+    "auto_downgrade_http2",
     "debuglevel",
     "disable_http2",
     "enable_http2",
@@ -193,6 +194,9 @@ def set_auto_downgrade_http2(enabled: bool):
     global AUTO_DOWNGRADE_HTTP2
     AUTO_DOWNGRADE_HTTP2 = bool(enabled)
     Http.auto_downgrade_http2 = bool(enabled)
+
+
+auto_downgrade_http2 = set_auto_downgrade_http2
 
 
 def reset_downgraded_hosts():

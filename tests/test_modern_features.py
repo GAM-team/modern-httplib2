@@ -617,3 +617,17 @@ def test_auto_downgrade_on_http2_failure(capsys):
         httplib2.debuglevel = old_debuglevel
         httplib2.reset_downgraded_hosts()
 
+
+def test_auto_downgrade_http2_module_level_helpers():
+    try:
+        httplib2.auto_downgrade_http2(True)
+        assert httplib2.AUTO_DOWNGRADE_HTTP2 is True
+        assert httplib2.Http.auto_downgrade_http2 is True
+
+        httplib2.set_auto_downgrade_http2(False)
+        assert httplib2.AUTO_DOWNGRADE_HTTP2 is False
+        assert httplib2.Http.auto_downgrade_http2 is False
+    finally:
+        httplib2.set_auto_downgrade_http2(True)
+
+
