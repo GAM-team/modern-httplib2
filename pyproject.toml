@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "modern-httplib2"
+version = "1.32.0"
+description = "A modern drop-in replacement for httplib2 powered by httpx"
+readme = "README.md"
+license = "Apache-2.0 AND MIT"
+authors = [
+    {name = "Jay Lee", email = "jay0lee@gmail.com"},
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pyparsing>=3.0.0",
+    "httpx[http2]>=0.28.0",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/GAM-team/modern-httplib2"
+Repository = "https://github.com/GAM-team/modern-httplib2"
+Issues = "https://github.com/GAM-team/modern-httplib2/issues"
+
+[project.optional-dependencies]
+socks = ["PySocks>=1.7.1"]
+test = [
+    "pytest",
+    "pytest-timeout",
+    "PySocks>=1.7.1",
+    "cryptography",
+    "google-auth",
+    "google-auth-httplib2",
+]
+
+[tool.setuptools.packages.find]
+include = ["modern_httplib2*"]
+
+[tool.setuptools.package-data]
+modern_httplib2 = ["cacerts.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["_TODO_legacy", ".venv", "build", "dist"]
+markers = [
+    "forked: run test in a forked subprocess",
+]

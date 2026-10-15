@@ -218,3 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific ignores
+_httplib2_test_cache/
+benchmark_results*.json
+*.swp
+.DS_Store

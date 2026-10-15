@@ -1,0 +1,108 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+# Default to least privilege across all jobs
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Verify, Test & Build Distributions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m pip install -e ".[dev]"
+
+      - name: Verify Git release tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - << 'EOF'
+          import os, sys, tomllib
+          import modern_httplib2
+
+          tag = os.environ["RELEASE_TAG"].lstrip("v")
+          with open("pyproject.toml", "rb") as f:
+              pyproject_version = tomllib.load(f)["project"]["version"]
+          pkg_version = modern_httplib2.__version__
+
+          print(f"Release tag version:      {tag}")
+          print(f"pyproject.toml version:   {pyproject_version}")
+          print(f"modern_httplib2 version:  {pkg_version}")
+
+          if not (tag == pyproject_version == pkg_version):
+              sys.exit(
+                  f"ERROR: Version mismatch! tag={tag!r}, "
+                  f"pyproject.toml={pyproject_version!r}, "
+                  f"__version__={pkg_version!r}"
+              )
+          EOF
+
+      - name: Run security and unit test suites
+        run: |
+          pytest tests/test_security.py -v
+          pytest
+
+      - name: Build sdist and wheel from clean tree
+        run: |
+          rm -rf dist/ build/ *.egg-info
+          python -m build
+
+      - name: Validate distributions with twine
+        run: twine check --strict dist/*
+
+      - name: Upload built distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 5
+
+  publish-pypi:
+    name: Publish to PyPI (Trusted Publisher OIDC)
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/modern-httplib2
+    permissions:
+      id-token: write      # Required for PyPI OIDC Trusted Publishing (no API tokens stored)
+      attestations: write  # Required for GitHub SLSA build provenance attestations
+      contents: read
+
+    steps:
+      - name: Download built distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Generate SLSA build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: "dist/*"
+
+      - name: Publish distribution to PyPI with PEP 740 attestations
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
