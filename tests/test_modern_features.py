@@ -631,3 +631,19 @@ def test_auto_downgrade_http2_module_level_helpers():
         httplib2.set_auto_downgrade_http2(True)
 
 
+def test_lazy_imports_compatibility():
+    """Verify that importing modern_httplib2 is safe even when sys.set_lazy_imports('all') is active."""
+    import sys
+    import importlib
+    if hasattr(sys, "set_lazy_imports"):
+        orig_mode = sys.get_lazy_imports() if hasattr(sys, "get_lazy_imports") else "none"
+        try:
+            sys.set_lazy_imports("all")
+            import modern_httplib2
+            importlib.reload(modern_httplib2)
+            assert modern_httplib2.__version__ == "1.32.0-1"
+        finally:
+            sys.set_lazy_imports(orig_mode)
+
+
+

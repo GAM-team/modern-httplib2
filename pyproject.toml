@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "modern-httplib2"
-version = "1.32.0"
+version = "1.32.0-1"
 description = "A modern drop-in replacement for httplib2 powered by httpx"
 readme = "README.md"
 license = "Apache-2.0 AND MIT"

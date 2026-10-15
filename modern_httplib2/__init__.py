@@ -40,40 +40,67 @@ __email__ = "jay0lee@gmail.com"
 __copyright__ = "Copyright 2026, Jay Lee"
 __contributors__ = ["Jay Lee"]
 __license__ = "MIT"
-__version__ = "1.32.0"
+__version__ = "1.32.0-1"
 
-import httpcore
-from httpcore._backends.base import (
-    NetworkBackend as _HttpcoreNetworkBackend,
-    NetworkStream as _HttpcoreNetworkStream,
-)
-from httpcore._exceptions import (
-    ConnectError as _HttpcoreConnectError,
-    ConnectTimeout as _HttpcoreConnectTimeout,
-    LocalProtocolError as _HttpcoreLocalProtocolError,
-    PoolTimeout as _HttpcorePoolTimeout,
-    ProtocolError as _HttpcoreProtocolError,
-    ProxyError as _HttpcoreProxyError,
-    ReadError as _HttpcoreReadError,
-    ReadTimeout as _HttpcoreReadTimeout,
-    RemoteProtocolError as _HttpcoreRemoteProtocolError,
-    TimeoutException as _HttpcoreTimeoutException,
-    WriteError as _HttpcoreWriteError,
-    WriteTimeout as _HttpcoreWriteTimeout,
-)
-from httpcore._models import (
-    Origin as _HttpcoreOrigin,
-    Request as _HttpcoreRequest,
-    Response as _HttpcoreResponse,
-    URL as _HttpcoreURL,
-)
-import httpcore._sync.connection as _httpcore_connection_mod
-from httpcore._sync.connection import HTTPConnection as _HttpcoreHTTPConnection
-from httpcore._sync.connection_pool import ConnectionPool as _HttpcoreConnectionPool
-from httpcore._sync.http2 import HTTP2Connection as _HttpcoreHTTP2Connection
-from httpcore._synchronization import Semaphore as _HttpcoreSemaphore
-from httpcore._utils import is_socket_readable as _is_socket_readable
-import httpx
+_lazy_mode = None
+if hasattr(sys, "get_lazy_imports") and hasattr(sys, "set_lazy_imports"):
+    try:
+        _lazy_mode = sys.get_lazy_imports()
+        try:
+            sys.set_lazy_imports("none")
+        except (ValueError, TypeError):
+            sys.set_lazy_imports("normal")
+    except Exception:
+        pass
+
+try:
+    import httpcore
+    from httpcore._backends.base import (
+        NetworkBackend as _HttpcoreNetworkBackend,
+        NetworkStream as _HttpcoreNetworkStream,
+    )
+    from httpcore._exceptions import (
+        ConnectError as _HttpcoreConnectError,
+        ConnectTimeout as _HttpcoreConnectTimeout,
+        LocalProtocolError as _HttpcoreLocalProtocolError,
+        PoolTimeout as _HttpcorePoolTimeout,
+        ProtocolError as _HttpcoreProtocolError,
+        ProxyError as _HttpcoreProxyError,
+        ReadError as _HttpcoreReadError,
+        ReadTimeout as _HttpcoreReadTimeout,
+        RemoteProtocolError as _HttpcoreRemoteProtocolError,
+        TimeoutException as _HttpcoreTimeoutException,
+        WriteError as _HttpcoreWriteError,
+        WriteTimeout as _HttpcoreWriteTimeout,
+    )
+    from httpcore._models import (
+        Origin as _HttpcoreOrigin,
+        Request as _HttpcoreRequest,
+        Response as _HttpcoreResponse,
+        URL as _HttpcoreURL,
+    )
+    import httpcore._sync.connection as _httpcore_connection_mod
+    from httpcore._sync.connection import HTTPConnection as _HttpcoreHTTPConnection
+    from httpcore._sync.connection_pool import ConnectionPool as _HttpcoreConnectionPool
+    from httpcore._sync.http11 import HTTP11Connection as _HttpcoreHTTP11Connection
+    from httpcore._sync.http2 import (
+        HTTP2Connection as _HttpcoreHTTP2Connection,
+        HTTP2ConnectionByteStream as _HttpcoreHTTP2ConnectionByteStream,
+        HTTPConnectionState as _HttpcoreHTTPConnectionState,
+        has_body_headers as _httpcore_has_body_headers,
+    )
+    from httpcore._synchronization import Semaphore as _HttpcoreSemaphore
+    from httpcore._utils import is_socket_readable as _is_socket_readable
+    import httpx
+    import h2.connection as _h2_connection
+    import h2.events as _h2_events
+    import h2.exceptions as _h2_exceptions
+finally:
+    if _lazy_mode is not None:
+        try:
+            sys.set_lazy_imports(_lazy_mode)
+        except Exception:
+            pass
 
 try:
     import socks
@@ -971,17 +998,6 @@ def proxy_info_from_url(url, method="http", noproxy=None):
 
     pi.bypass_hosts = bypass_hosts
     return pi
-
-
-import h2.connection as _h2_connection
-import h2.events as _h2_events
-import h2.exceptions as _h2_exceptions
-from httpcore._sync.http11 import HTTP11Connection as _HttpcoreHTTP11Connection
-from httpcore._sync.http2 import (
-    HTTP2ConnectionByteStream as _HttpcoreHTTP2ConnectionByteStream,
-     HTTPConnectionState as _HttpcoreHTTPConnectionState,
-    has_body_headers as _httpcore_has_body_headers,
-)
 
 
 def _unwrap_httpcore_exception(exc):
