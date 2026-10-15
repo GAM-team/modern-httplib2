@@ -26,11 +26,12 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip build twine
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[test]"
 
       - name: Verify Git release tag matches package version
         env:
@@ -59,8 +60,8 @@ jobs:
 
       - name: Run security and unit test suites
         run: |
-          pytest tests/test_security.py -v
-          pytest
+          python -m pytest tests/test_security.py -v
+          python -m pytest
 
       - name: Build sdist and wheel from clean tree
         run: |
@@ -68,7 +69,7 @@ jobs:
           python -m build
 
       - name: Validate distributions with twine
-        run: twine check --strict dist/*
+        run: python -m twine check --strict dist/*
 
       - name: Upload built distributions
         uses: actions/upload-artifact@v4

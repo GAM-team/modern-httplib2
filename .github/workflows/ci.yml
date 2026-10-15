@@ -41,17 +41,18 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
           cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m pip install -e ".[test]"
 
       - name: Run security test suite
-        run: pytest tests/test_security.py -v
+        run: python -m pytest tests/test_security.py -v
 
       - name: Run full test suite
-        run: pytest
+        run: python -m pytest
 
   package-and-audit:
     name: Build Verification & Dependency Audit
@@ -67,30 +68,29 @@ jobs:
         with:
           python-version: "3.13"
           cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install build and audit tools
         run: |
           python -m pip install --upgrade pip build twine pip-audit
 
-      - name: Audit runtime dependencies for vulnerabilities
-        run: |
-          python -m pip install .
-          pip-audit
-
       - name: Build sdist and wheel
         run: python -m build
 
       - name: Validate package metadata
-        run: twine check --strict dist/*
+        run: python -m twine check --strict dist/*
 
-      - name: Smoke-test wheel installation and .pth shim
+      - name: Smoke-test wheel installation and audit runtime dependencies
         run: |
           python -m venv /tmp/smoke-venv
           /tmp/smoke-venv/bin/pip install dist/*.whl
           /tmp/smoke-venv/bin/python -c "
+          import modern_httplib2.auto
           import httplib2, modern_httplib2
           assert httplib2 is modern_httplib2
           assert httplib2.__name__ == 'modern-httplib2'
           assert httplib2.__version__ == modern_httplib2.__version__
           print('Smoke test passed:', httplib2.__name__, httplib2.__version__)
           "
+          SITE_PKGS=$(/tmp/smoke-venv/bin/python -c "import sysconfig; print(sysconfig.get_path('purelib'))")
+          python -m pip_audit --path "$SITE_PKGS"

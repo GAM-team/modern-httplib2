@@ -634,4 +634,5 @@ def test_safename_prevents_path_traversal(malicious_uri):
     assert "/" not in safe
     assert "\\" not in safe
     assert "\x00" not in safe
-    assert os.path.dirname(os.path.normpath(os.path.join("/cache", safe))) == "/cache"
+    cache_dir = os.path.normpath("/cache")
+    assert os.path.dirname(os.path.normpath(os.path.join(cache_dir, safe))) == cache_dir
