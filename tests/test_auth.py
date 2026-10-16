@@ -194,15 +194,9 @@ def test_digest_auth_stale():
     ),
     ids=lambda data: str(data[0]),
 )
-@pytest.mark.parametrize("strict", (True, False), ids=("strict", "relax"))
-def test_parse_www_authenticate_correct(data, strict):
+def test_parse_www_authenticate_correct(data):
     headers, info = data
-    # FIXME: move strict to parse argument
-    httplib2.USE_WWW_AUTH_STRICT_PARSING = strict
-    try:
-        assert httplib2.auth._parse_www_authenticate(headers) == info
-    finally:
-        httplib2.USE_WWW_AUTH_STRICT_PARSING = 0
+    assert httplib2.auth._parse_www_authenticate(headers) == info
 
 
 @pytest.mark.parametrize(
@@ -359,49 +353,3 @@ def test_digest_object_auth_info():
     assert d.challenge["nonce"] == "fred"
     assert d.challenge["nc"] == 1
 
-
-def test_wsse_algorithm():
-    digest = httplib2._wsse_username_token("d36e316282959a9ed4c89851497a717f", "2003-12-15T14:43:07Z", "taadtaadpstcsm")
-    expected = "quR/EWLAV4xLf9Zqyw4pDmfV9OY="
-    assert expected == digest
-
-
-def test_wsse_invalid():
-    http = httplib2.Http()
-    username = "user294"
-    password = tests.gen_password()
-    grenew_nonce = [None]
-    requests = []
-    handler = tests.http_reflect_with_auth(
-        allow_scheme="wsse",
-        allow_credentials=((username, password),),
-        out_renew_nonce=grenew_nonce,
-        out_requests=requests,
-    )
-    http.add_credentials(username, "wrong" + password)
-    with tests.server_request(handler, request_count=2) as uri:
-        response, _ = http.request(uri)
-        assert requests[0][1].status == 401
-        assert requests[1][0].headers["authorization"] == 'WSSE profile="UsernameToken"'
-        assert requests[1][1].status == 401
-        assert response.status == 401
-
-
-def test_wsse_ok():
-    http = httplib2.Http()
-    username = "user314"
-    password = tests.gen_password()
-    grenew_nonce = [None]
-    requests = []
-    handler = tests.http_reflect_with_auth(
-        allow_scheme="wsse",
-        allow_credentials=((username, password),),
-        out_renew_nonce=grenew_nonce,
-        out_requests=requests,
-    )
-    http.add_credentials(username, password)
-    with tests.server_request(handler, request_count=2) as uri:
-        response, _ = http.request(uri)
-        assert requests[0][1].status == 401
-        assert requests[1][0].headers["authorization"] == 'WSSE profile="UsernameToken"'
-        assert response.status == 200

@@ -64,7 +64,7 @@ modern_httplib2 = ["cacerts.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-norecursedirs = ["_TODO_legacy", ".venv", "build", "dist"]
+norecursedirs = [".venv", "build", "dist"]
 markers = [
     "forked: run test in a forked subprocess",
 ]

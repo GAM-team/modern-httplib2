@@ -11,10 +11,7 @@ import email.message
 import email.utils
 import errno
 import functools
-from gettext import gettext as _
 from hashlib import md5 as _md5
-from hashlib import sha1 as _sha
-import hmac
 import http.client
 import os
 import queue
@@ -141,7 +138,6 @@ __all__ = [
     "set_enable_http2",
     "unpatch",
     "UnimplementedDigestAuthOptionError",
-    "UnimplementedHmacDigestAuthOptionError",
 ]
 
 # The httplib debug level, set to a non-zero value to get debug output
@@ -425,13 +421,6 @@ def _parse_cache_control(headers):
     return retval
 
 
-# Whether to use a strict mode to parse WWW-Authenticate headers
-# Might lead to bad results in case of ill-formed header value,
-# so disabled by default, falling back to relaxed parsing.
-# Set to true to turn on, useful for testing servers.
-USE_WWW_AUTH_STRICT_PARSING = 0
-
-
 def _entry_disposition(response_headers, request_headers):
     """Determine freshness from the Date, Expires and Cache-Control headers."""
     retval = "STALE"
@@ -498,29 +487,11 @@ def _decompressContent(response, new_content, limit_kwargs):
     except (IOError, zlib.error):
         content = ""
         raise FailedToDecompressContent(
-            _("Content purported to be compressed with %s but failed to decompress.")
-            % encoding,
+            f"Content purported to be compressed with {encoding} but failed to decompress.",
             response,
             content,
         )
     return content
-
-
-def _bind_write_headers(msg):
-    def _write_headers(self):
-        # Self refers to the Generator object.
-        for h, v in msg.items():
-            print("%s:" % h, end=" ", file=self._fp)
-            if isinstance(v, header.Header):
-                print(v.encode(maxlinelen=self._maxheaderlen), file=self._fp)
-            else:
-                # email.Header got lots of smarts, so use it.
-                headers = header.Header(v, maxlinelen=self._maxheaderlen, charset="utf-8", header_name=h)
-                print(headers.encode(), file=self._fp)
-        # A blank line always separates headers from body.
-        print(file=self._fp)
-
-    return _write_headers
 
 
 def _updateCache(request_headers, response_headers, content, cache, cachekey):
@@ -553,12 +524,7 @@ def _updateCache(request_headers, response_headers, content, cache, cachekey):
 
             status_header = "status: %d\r\n" % status
 
-            try:
-                header_str = info.as_string()
-            except UnicodeEncodeError:
-                setattr(info, "_write_headers", _bind_write_headers(info))
-                header_str = info.as_string()
-
+            header_str = info.as_string()
             header_str = re.sub("\r(?!\n)|(?<!\r)\n", "\r\n", header_str)
             text = b"".join([status_header.encode("utf-8"), header_str.encode("utf-8"), content])
 
@@ -570,12 +536,6 @@ def _cnonce():
         ("%s:%s" % (time.ctime(), ["0123456789"[random.randrange(0, 9)] for i in range(20)])).encode("utf-8")
     ).hexdigest()
     return dig[:16]
-
-
-def _wsse_username_token(cnonce, iso_now, password):
-    return (
-        base64.b64encode(_sha(f"{cnonce}{iso_now}{password}".encode("utf-8")).digest()).strip().decode("utf-8")
-    )
 
 
 class Authentication:
@@ -653,11 +613,11 @@ class DigestAuthentication(Authentication):
         qop = self.challenge.get("qop", "auth")
         self.challenge["qop"] = "auth" if "auth" in [x.strip() for x in qop.split()] else None
         if self.challenge["qop"] is None:
-            raise UnimplementedDigestAuthOptionError(_(f"Unsupported value for qop: {qop}."))
+            raise UnimplementedDigestAuthOptionError(f"Unsupported value for qop: {qop}.")
         self.challenge["algorithm"] = self.challenge.get("algorithm", "MD5").upper()
         if self.challenge["algorithm"] != "MD5":
             raise UnimplementedDigestAuthOptionError(
-                _(f"Unsupported value for algorithm: {self.challenge['algorithm']}.")
+                f"Unsupported value for algorithm: {self.challenge['algorithm']}."
             )
         self.A1 = "".join([self.credentials[0], ":", self.challenge["realm"], ":", self.credentials[1]])
         self.challenge["nc"] = 1
@@ -699,128 +659,12 @@ class DigestAuthentication(Authentication):
         return False
 
 
-class HmacDigestAuthentication(Authentication):
-    """HMAC Digest authentication implementation."""
-
-    __author__ = "Jay Lee"
-
-    def __init__(self, credentials, host, request_uri, headers, response, content, http):
-        super().__init__(credentials, host, request_uri, headers, response, content, http)
-        challenge = auth._parse_www_authenticate(response, "www-authenticate")
-        self.challenge = challenge["hmacdigest"]
-        self.challenge["reason"] = self.challenge.get("reason", "unauthorized")
-        if self.challenge["reason"] not in ["unauthorized", "integrity"]:
-            self.challenge["reason"] = "unauthorized"
-        self.challenge["salt"] = self.challenge.get("salt", "")
-        if not self.challenge.get("snonce"):
-            raise UnimplementedHmacDigestAuthOptionError(
-                _("The challenge doesn't contain a server nonce, or this one is empty.")
-            )
-        self.challenge["algorithm"] = self.challenge.get("algorithm", "HMAC-SHA-1")
-        if self.challenge["algorithm"] not in ["HMAC-SHA-1", "HMAC-MD5"]:
-            raise UnimplementedHmacDigestAuthOptionError(
-                _(f"Unsupported value for algorithm: {self.challenge['algorithm']}.")
-            )
-        self.challenge["pw-algorithm"] = self.challenge.get("pw-algorithm", "SHA-1")
-        if self.challenge["pw-algorithm"] not in ["SHA-1", "MD5"]:
-            raise UnimplementedHmacDigestAuthOptionError(
-                _(f"Unsupported value for pw-algorithm: {self.challenge['pw-algorithm']}.")
-            )
-        if self.challenge["algorithm"] == "HMAC-MD5":
-            self.hashmod = _md5
-        else:
-            self.hashmod = _sha
-        if self.challenge["pw-algorithm"] == "MD5":
-            self.pwhashmod = _md5
-        else:
-            self.pwhashmod = _sha
-        self.key = "".join(
-            [
-                self.credentials[0],
-                ":",
-                self.pwhashmod.new("".join([self.credentials[1], self.challenge["salt"]])).hexdigest().lower(),
-                ":",
-                self.challenge["realm"],
-            ]
-        )
-        self.key = self.pwhashmod.new(self.key).hexdigest().lower()
-
-    def request(self, method, request_uri, headers, content):
-        """Modify the request headers"""
-        keys = _get_end2end_headers(headers)
-        keylist = "".join([f"{k} " for k in keys])
-        headers_val = "".join([headers[k] for k in keys])
-        created = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        cnonce = _cnonce()
-        request_digest = f"{method}:{request_uri}:{cnonce}:{self.challenge['snonce']}:{headers_val}"
-        request_digest = hmac.new(self.key, request_digest, self.hashmod).hexdigest().lower()
-        headers["authorization"] = (
-            f'HMACDigest username="{self.credentials[0]}", realm="{self.challenge["realm"]}", '
-            f'snonce="{self.challenge["snonce"]}", cnonce="{cnonce}", uri="{request_uri}", '
-            f'created="{created}", response="{request_digest}", headers="{keylist}"'
-        )
-
-    def response(self, response, content):
-        challenge = auth._parse_www_authenticate(response, "www-authenticate").get("hmacdigest", {})
-        return challenge.get("reason") in ["integrity", "stale"]
-
-
-class WsseAuthentication(Authentication):
-    def __init__(self, credentials, host, request_uri, headers, response, content, http):
-        super().__init__(credentials, host, request_uri, headers, response, content, http)
-
-    def request(self, method, request_uri, headers, content):
-        """Modify the request headers to add the appropriate
-        Authorization header."""
-        headers["authorization"] = 'WSSE profile="UsernameToken"'
-        iso_now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        cnonce = _cnonce()
-        password_digest = _wsse_username_token(cnonce, iso_now, self.credentials[1])
-        headers["X-WSSE"] = (
-            f'UsernameToken Username="{self.credentials[0]}", PasswordDigest="{password_digest}", '
-            f'Nonce="{cnonce}", Created="{iso_now}"'
-        )
-
-
-class GoogleLoginAuthentication(Authentication):
-    def __init__(self, credentials, host, request_uri, headers, response, content, http):
-        from urllib.parse import urlencode
-
-        super().__init__(credentials, host, request_uri, headers, response, content, http)
-        challenge = auth._parse_www_authenticate(response, "www-authenticate")
-        service = challenge["googlelogin"].get("service", "xapi")
-        if service == "xapi" and request_uri.find("calendar") > 0:
-            service = "cl"
-
-        auth_dict = dict(Email=credentials[0], Passwd=credentials[1], service=service, source=headers["user-agent"])
-        resp, content = self.http.request(
-            "https://www.google.com/accounts/ClientLogin",
-            method="POST",
-            body=urlencode(auth_dict),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        lines = content.split("\n")
-        d = dict(tuple(line.split("=", 1)) for line in lines if line)
-        if resp.status == 403:
-            self.Auth = ""
-        else:
-            self.Auth = d["Auth"]
-
-    def request(self, method, request_uri, headers, content):
-        """Modify the request headers to add the appropriate
-        Authorization header."""
-        headers["authorization"] = f"GoogleLogin Auth={self.Auth}"
-
-
 AUTH_SCHEME_CLASSES = {
     "basic": BasicAuthentication,
-    "wsse": WsseAuthentication,
     "digest": DigestAuthentication,
-    "hmacdigest": HmacDigestAuthentication,
-    "googlelogin": GoogleLoginAuthentication,
 }
 
-AUTH_SCHEME_ORDER = ["hmacdigest", "googlelogin", "digest", "wsse", "basic"]
+AUTH_SCHEME_ORDER = ["digest", "basic"]
 
 
 class FileCache:
@@ -2625,7 +2469,7 @@ class Http:
                 if redirections:
                     if "location" not in response and response.status != 300:
                         raise RedirectMissingLocation(
-                            _("Redirected but the response is missing a Location: header."), response, content,
+                            "Redirected but the response is missing a Location: header.", response, content,
                         )
                     if "location" in response:
                         location = response["location"]

@@ -294,7 +294,6 @@ def test_attribution_and_python_version_metadata():
     assert httplib2.__contributors__ == ["Jay Lee"]
     assert "Jay Lee" in httplib2.__copyright__
     assert httplib2.__version__.startswith("1.32.")
-    assert httplib2.HmacDigestAuthentication.__author__ == "Jay Lee"
     assert iri2uri_mod.__author__ == "Jay Lee"
     assert iri2uri_mod.__contributors__ == ["Jay Lee"]
 

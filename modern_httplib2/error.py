@@ -30,10 +30,6 @@ class UnimplementedDigestAuthOptionError(HttpLib2ErrorWithResponse):
     pass
 
 
-class UnimplementedHmacDigestAuthOptionError(HttpLib2ErrorWithResponse):
-    pass
-
-
 class MalformedHeader(HttpLib2Error):
     pass
 
