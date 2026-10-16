@@ -19,9 +19,7 @@ except ImportError:
     pass
 
 
-BUILTIN_CA_CERTS = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "cacerts.txt"
-)
+BUILTIN_CA_CERTS = certifi_where() if certifi_available else None
 
 
 def where():
@@ -35,7 +33,10 @@ def where():
         return custom_ca_locater_where()
     if certifi_available:
         return certifi_where()
-    return BUILTIN_CA_CERTS
+    raise RuntimeError(
+        "No CA certificates bundle found. Please install 'certifi' or set the "
+        "HTTPLIB2_CA_CERTS environment variable."
+    )
 
 
 if __name__ == "__main__":

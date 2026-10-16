@@ -37,7 +37,7 @@ __email__ = "jay0lee@gmail.com"
 __copyright__ = "Copyright 2026, Jay Lee"
 __contributors__ = ["Jay Lee"]
 __license__ = "MIT"
-__version__ = "1.32.0-1"
+__version__ = "1.32.0-2"
 
 _lazy_mode = None
 if hasattr(sys, "get_lazy_imports") and hasattr(sys, "set_lazy_imports"):

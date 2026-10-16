@@ -57,7 +57,7 @@ def test_google_libraries_interop():
 
 
 def test_package_metadata():
-    assert modern_httplib2.__version__ == "1.32.0-1"
+    assert modern_httplib2.__version__ == "1.32.0-2"
     assert modern_httplib2.__author__ == "Jay Lee"
     assert modern_httplib2.__email__ == "jay0lee@gmail.com"
 

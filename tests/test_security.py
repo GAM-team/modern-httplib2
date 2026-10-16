@@ -197,7 +197,7 @@ def _generate_ca_and_localhost_cert(tmp_path, name):
 
 def test_custom_ca_list_replaces_default_ca_store_entirely():
     """Passing a custom ca_certs file must load ONLY the CAs in that file into the SSLContext,
-    without merging the default certifi/cacerts.txt bundle or OS system roots.
+    without merging the default certifi bundle or OS system roots.
     """
     default_conn = httplib2.HTTPSConnectionWithTimeout("localhost")
     default_ca_list = default_conn._context.get_ca_certs()
